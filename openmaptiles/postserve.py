@@ -125,7 +125,10 @@ class GetMetadata(RequestHandledWithCors):
         self.metadata = metadata
 
     def get(self):
-        self.write(self.metadata)
+        key = self.get_query_argument('key', '')
+        metadata = dict(self.metadata)
+        metadata['tiles'] = [metadata['tiles'][0] + '?key=' + key]
+        self.write(metadata)
         print('Returning metadata')
 
 
