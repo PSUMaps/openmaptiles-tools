@@ -35,7 +35,7 @@ jobs:
             # Any vNNN.NNN branch -- builds "test-NNN.NNN" image
             # Also allows vNNN.NNN-XXX  -- where XXX could be anything (builds test-NNN.NNN-XXX)
             export VERSION="test-${BASH_REMATCH[1]}"
-          elif [[ "${GITHUB_REF:?}" =~ ^refs/tags/v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+          elif [[ "${GITHUB_REF:?}" =~ ^refs/tags/indoorequal-v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
             # Any vNNN.NNN.NNN tag (not branch!) -- builds "NNN.NNN.NNN" and "NNN.NNN" images
             # This means that the two-part version image will always point to latest patch.
             export VERSION="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]} \
@@ -62,7 +62,7 @@ jobs:
 
           function push_docker {
             for ver in $VERSION; do
-              docker push openmaptiles/$1:$ver
+              docker push indoorequal/$1:$ver
             done
           }
 
@@ -77,15 +77,6 @@ jobs:
           df -h .
 
           # TODO: fix unavailable image error inside the make target
-          NO_REFRESH=1 make build-postgis-preloaded
+          NO_REFRESH=1 make build-postgis
           push_docker postgis
-          push_docker import-data
-          push_docker postgis-preloaded
           df -h .
-
-          # The generate-vectortiles docker image often fails build, so leave it as last step
-          df -h .
-          sudo docker system prune --all --force
-          df -h .
-          make build-generate-vectortiles
-          push_docker generate-vectortiles
