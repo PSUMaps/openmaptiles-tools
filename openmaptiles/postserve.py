@@ -1,4 +1,9 @@
 import logging
+import os
+import re
+import json
+from datetime import datetime, timezone
+from dateutil.parser import parse
 from functools import partial
 from typing import Union, List, Any, Dict
 
@@ -33,6 +38,22 @@ class RequestHandledWithCors(RequestHandler):
         # but without sending the actual content back.
         # We must implement it to support QGIS
         self.finish()
+
+
+class GetReplicationStatus(RequestHandledWithCors):
+    def initialize(self, verbose):
+        self.verbose = verbose
+
+    async def get(self):
+        self.set_header('Content-Type', 'application/json')
+        state_file = open(os.path.join('/tileset', 'data', 'last.state.txt'), 'r')
+        content = state_file.read()
+        state_file.close()
+        last_update_timestamp = re.match(r'timestamp=(.+)', content)[1].replace('\\', '')
+        last_update_date = parse(last_update_timestamp)
+        lag_minutes = (datetime.now(timezone.utc) - last_update_date).seconds / 60
+        lag_status = 'ok' if lag_minutes < 90 else 'degraded' if lag_minutes < 120 else 'ko'
+        self.write(json.dumps({'timestamp': last_update_timestamp, 'lag': lag_status}))
 
 
 class GetPoi(RequestHandledWithCors):
@@ -325,6 +346,11 @@ class Postserve:
                 r'/',
                 GetMetadata,
                 dict(metadata=self.metadata)
+            ),
+            (
+                r'/replicationstatus',
+                GetReplicationStatus,
+                dict(verbose=self.verbose)
             ),
             (
                 r'/poi/(way|relation|node):([0-9]+)',
