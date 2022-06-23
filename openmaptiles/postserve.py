@@ -46,7 +46,7 @@ class GetReplicationStatus(RequestHandledWithCors):
 
     async def get(self):
         self.set_header('Content-Type', 'application/json')
-        state_file = open(os.path.join('/tileset', 'data', 'last.state.txt'), 'r')
+        state_file = open(os.getenv('STATE_FILE'), 'r')
         content = state_file.read()
         state_file.close()
         last_update_timestamp = re.match(r'timestamp=(.+)', content)[1].replace('\\', '')
