@@ -1,8 +1,6 @@
 FROM golang:1.17 as go-builder
 ARG IMPOSM_REPO="https://github.com/omniscale/imposm3.git"
-ARG IMPOSM_VERSION="v0.11.1"
-
-COPY ./patch_imposm_single_space.diff ./patch_imposm_single_diff.diff /tmp/
+ARG IMPOSM_VERSION="master"
 
 # Build imposm
 RUN set -eux ;\
@@ -27,7 +25,6 @@ RUN set -eux ;\
     git clone --quiet --depth 1 $IMPOSM_REPO -b $IMPOSM_VERSION \
         $GOPATH/src/github.com/omniscale/imposm3 ;\
     cd $GOPATH/src/github.com/omniscale/imposm3 ;\
-    git apply /tmp/patch_imposm_*.diff ;\
     make build ;\
     # Older imposm executable was called imposm3 - rename it to the common name "imposm"
     ( [ -f imposm ] && mv imposm /build-bin/imposm || mv imposm3 /build-bin/imposm )
