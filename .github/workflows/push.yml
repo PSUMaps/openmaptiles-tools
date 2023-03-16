@@ -15,16 +15,8 @@ jobs:
         uses: actions/checkout@v2
 
       - name: main
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
         run: |
           make test
-
-          if [[ -z "$DOCKERHUB_USERNAME" ]] || [[ -z "$DOCKERHUB_PASSWORD" ]]; then
-            echo "Docker Hub secrets are not configured in this repo, exiting early"
-            exit 0
-          fi
 
           unset VERSION
           set -eux
@@ -52,17 +44,10 @@ jobs:
           fi
 
           echo "Building and publishing tags $VERSION"
-          echo "Authenticating to Docker Hub..."
-          echo "${DOCKERHUB_PASSWORD}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
-
-          function script_cleanup {
-            docker logout
-          }
-          trap script_cleanup EXIT
 
           function push_docker {
             for ver in $VERSION; do
-              docker push indoorequal/$1:$ver
+              docker push ghcr.io/indoorequal/$1:$ver
             done
           }
 
