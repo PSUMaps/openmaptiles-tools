@@ -18,6 +18,8 @@ jobs:
         run: |
           make test
 
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+
           unset VERSION
           set -eux
           if [[ "${GITHUB_REF:?}" == "refs/heads/master" ]]; then
