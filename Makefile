@@ -72,7 +72,7 @@ build-generate-vectortiles:
 .PHONY: build-postgis
 build-postgis:
 	docker build $(DOCKER_BUILD_EXTRAS) \
-		$(foreach ver, $(VERSION), --tag $(IMAGE_REPO)/postgis:$(ver)) \
+		$(foreach ver, $(VERSION), --tag ghcr.io/$(IMAGE_REPO)/postgis:$(ver)) \
 		docker/postgis
 
 .PHONY: build-import-data
