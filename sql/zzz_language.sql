@@ -88,7 +88,27 @@ $$ LANGUAGE SQL IMMUTABLE STRICT;
 CREATE OR REPLACE FUNCTION get_basic_names(tags hstore, geometry geometry) RETURNS hstore AS $$
 DECLARE
   tags_array text[] := ARRAY[]::text[];
+  name_latin text;
+  name_nonlatin text;
+  name_int text;
 BEGIN
+  name_latin := get_latin_name(tags, geometry);
+  name_nonlatin := get_nonlatin_name(tags);
+  IF (name_nonlatin = name_latin) THEN
+    name_nonlatin := null;
+  END IF;
+  name_int := COALESCE(
+    NULLIF(tags->'int_name', ''),
+    NULLIF(tags->'name:en', ''),
+    NULLIF(name_latin, ''),
+    tags->'name'
+  );
+  IF name_nonlatin IS NOT NULL THEN
+    tags_array := tags_array || ARRAY['name:nonlatin', name_nonlatin];
+  END IF;
+  IF name_int IS NOT NULL THEN
+    tags_array := tags_array || ARRAY['name_int', name_int];
+  END IF;
   RETURN hstore(tags_array);
 END;
 $$
