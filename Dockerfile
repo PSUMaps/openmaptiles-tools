@@ -127,12 +127,11 @@ RUN set -eux ;\
         libprotobuf-dev \
         ;\
     # generate-tiles
-    curl -sL https://deb.nodesource.com/setup_14.x | bash -  ;\
-    DEBIAN_FRONTEND=noninteractive apt-get update  ;\
+    curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -  ;\
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends  \
-        nodejs npm build-essential ;\
+        nodejs build-essential ;\
     rm -rf /var/lib/apt/lists/  ;\
-    npm install -g \
+    npm install -g --unsafe-perm=true \
       @mapbox/mbtiles@0.12.1 \
       @mapbox/tilelive@6.1.1 \
       tilelive-pgquery@1.2.0 ;\
