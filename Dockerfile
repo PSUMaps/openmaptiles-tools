@@ -115,13 +115,11 @@ RUN set -eux ;\
         libprotobuf-dev \
         ;\
     # generate-tiles
-    curl -sL https://deb.nodesource.com/setup_14.x | bash -  ;\
-    DEBIAN_FRONTEND=noninteractive apt-get update  ;\
+    curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -  ;\
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends  \
         nodejs npm build-essential ;\
     rm -rf /var/lib/apt/lists/  ;\
-    npm config set unsafe-perm true  ;\
-    npm install -g \
+    npm install -g --unsafe-perm=true \
       @mapbox/mbtiles@0.12.1 \
       @mapbox/tilelive@6.1.1 \
       @beyondtracks/spritezero-cli@2.3.1 \
