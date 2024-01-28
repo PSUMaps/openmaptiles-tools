@@ -1,4 +1,9 @@
 import logging
+import os
+import re
+import json
+from datetime import datetime, timezone
+from dateutil.parser import parse
 from functools import partial
 from typing import Union, List, Any, Dict
 
@@ -33,6 +38,68 @@ class RequestHandledWithCors(RequestHandler):
         # but without sending the actual content back.
         # We must implement it to support QGIS
         self.finish()
+
+
+class GetReplicationStatus(RequestHandledWithCors):
+    def initialize(self, verbose):
+        self.verbose = verbose
+
+    async def get(self):
+        self.set_header('Content-Type', 'application/json')
+        state_file = open(os.getenv('STATE_FILE'), 'r')
+        content = state_file.read()
+        state_file.close()
+        last_update_timestamp = re.match(r'timestamp=(.+)', content)[1].replace('\\', '')
+        last_update_date = parse(last_update_timestamp)
+        lag_minutes = (datetime.now(timezone.utc) - last_update_date).seconds / 60
+        lag_status = 'ok' if lag_minutes < 90 else 'degraded' if lag_minutes < 120 else 'ko'
+        self.write(json.dumps({'timestamp': last_update_timestamp, 'lag': lag_status}))
+
+
+class GetPoi(RequestHandledWithCors):
+    pool: Pool
+    query: str
+    verbose: bool
+    connection: Union[Connection, None]
+    cancelled: bool
+
+    def initialize(self, pool, verbose):
+        self.pool = pool
+        self.verbose = verbose
+
+    async def get(self, type, id):
+        messages: List[PostgresLogMessage] = []
+
+        def logger(_, log_msg: PostgresLogMessage):
+            messages.append(log_msg)
+
+        self.set_header('Content-Type', 'application/json')
+        try:
+            async with self.pool.acquire() as connection:
+                connection.add_log_listener(logger)
+                self.connection = connection
+                query = """SELECT get_poi($1);"""
+                geojson = await connection.fetchval(query, f'{type}:{id}')
+                if geojson is not None:
+                    self.write(geojson)
+                else:
+                    self.set_status(404)
+                for msg in messages:
+                    PgWarnings.print_message(msg)
+                connection.remove_log_listener(logger)
+
+        except ConnectionDoesNotExistError as err:
+            if not self.cancelled:
+                raise err
+            elif self.verbose:
+                print(f'GET POI {type}:{id} was cancelled.')
+        finally:
+            self.connection = None
+
+    def on_connection_close(self):
+        if self.connection:
+            self.cancelled = True
+            self.connection.terminate()
 
 
 class GetTile(RequestHandledWithCors):
@@ -125,7 +192,10 @@ class GetMetadata(RequestHandledWithCors):
         self.metadata = metadata
 
     def get(self):
-        self.write(self.metadata)
+        key = self.get_query_argument('key', '')
+        metadata = dict(self.metadata)
+        metadata['tiles'] = [metadata['tiles'][0] + '?key=' + key]
+        self.write(metadata)
         print('Returning metadata')
 
 
@@ -276,6 +346,16 @@ class Postserve:
                 r'/',
                 GetMetadata,
                 dict(metadata=self.metadata)
+            ),
+            (
+                r'/replicationstatus',
+                GetReplicationStatus,
+                dict(verbose=self.verbose)
+            ),
+            (
+                r'/poi/(way|relation|node):([0-9]+)',
+                GetPoi,
+                dict(pool=self.pool, verbose=self.verbose)
             ),
             (
                 r'/tiles/([0-9]+)/([0-9]+)/([0-9]+).pbf',

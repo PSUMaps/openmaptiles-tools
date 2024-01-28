@@ -4,8 +4,8 @@ SHELL         = /bin/bash
 
 # VERSION could be set to more than one space-separated value, e.g. "5.3.2 5.3"
 VERSION      ?= $(shell sed -E -n "/__version__/s/^(.*'([^']+)'.*)$$/\2/p" ./openmaptiles/__init__.py)
-IMAGE_REPO   ?= openmaptiles
-IMAGE_NAME   ?= $(IMAGE_REPO)/openmaptiles-tools
+IMAGE_REPO   ?= indoorequal
+IMAGE_NAME   ?= ghcr.io/$(IMAGE_REPO)/openmaptiles-tools
 DOCKER_IMAGE ?= $(IMAGE_NAME):$(word 1,$(VERSION))
 BUILD_DIR    ?= build
 
@@ -72,7 +72,7 @@ build-generate-vectortiles:
 .PHONY: build-postgis
 build-postgis:
 	docker build $(DOCKER_BUILD_EXTRAS) \
-		$(foreach ver, $(VERSION), --tag $(IMAGE_REPO)/postgis:$(ver)) \
+		$(foreach ver, $(VERSION), --tag ghcr.io/$(IMAGE_REPO)/postgis:$(ver)) \
 		docker/postgis
 
 .PHONY: build-import-data
