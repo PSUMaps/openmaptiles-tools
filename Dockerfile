@@ -117,7 +117,7 @@ RUN set -eux ;\
     # generate-tiles
     curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -  ;\
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends  \
-        nodejs npm build-essential ;\
+        nodejs build-essential ;\
     rm -rf /var/lib/apt/lists/  ;\
     npm install -g --unsafe-perm=true \
       @mapbox/mbtiles@0.12.1 \
