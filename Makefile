@@ -4,7 +4,7 @@ SHELL         = /bin/bash
 
 # VERSION could be set to more than one space-separated value, e.g. "5.3.2 5.3"
 VERSION      ?= $(shell sed -E -n "/__version__/s/^(.*'([^']+)'.*)$$/\2/p" ./openmaptiles/__init__.py)
-IMAGE_REPO   ?= indoorequal
+IMAGE_REPO   ?= psumaps
 IMAGE_NAME   ?= ghcr.io/$(IMAGE_REPO)/openmaptiles-tools
 DOCKER_IMAGE ?= $(IMAGE_NAME):$(word 1,$(VERSION))
 BUILD_DIR    ?= build

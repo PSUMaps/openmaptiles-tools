@@ -49,7 +49,7 @@ jobs:
 
           function push_docker {
             for ver in $VERSION; do
-              docker push ghcr.io/PSUMaps/$1:$ver
+              docker push ghcr.io/psumaps/$1:$ver
             done
           }
 
