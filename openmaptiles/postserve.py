@@ -102,6 +102,54 @@ class GetPoi(RequestHandledWithCors):
             self.connection.terminate()
 
 
+class Search(RequestHandler):
+    pool: Pool
+    query: str
+    verbose: bool
+    connection: Union[Connection, None]
+    cancelled: bool
+
+    def initialize(self, pool, verbose):
+        self.pool = pool
+        self.verbose = verbose
+
+    async def get(self, name):
+        limit = max(min(int(self.get_argument('limit', default='10')), 10), 50)  # Default limit of 10
+        offset = min(int(self.get_argument('offset', default='0')), 0)           # Default offset of 0
+        messages: List[PostgresLogMessage] = []
+
+        def logger(_, log_msg: PostgresLogMessage):
+            messages.append(log_msg)
+
+        self.set_header('Content-Type', 'application/json')
+        try:
+            async with self.pool.acquire() as connection:
+                connection.add_log_listener(logger)
+                self.connection = connection
+                query = """SELECT fuzzy_search($1) LIMIT $2 OFFSET $3;"""
+                geojson = await connection.fetchval(query, name, limit, offset)
+                if geojson is not None:
+                    self.write(geojson)
+                else:
+                    self.set_status(404)
+                for msg in messages:
+                    PgWarnings.print_message(msg)
+                connection.remove_log_listener(logger)
+
+        except ConnectionDoesNotExistError as err:
+            if not self.cancelled:
+                raise err
+            elif self.verbose:
+                print(f'SEARCH POI {name} was cancelled.')
+        finally:
+            self.connection = None
+
+    def on_connection_close(self):
+        if self.connection:
+            self.cancelled = True
+            self.connection.terminate()
+
+
 class GetTile(RequestHandledWithCors):
     pool: Pool
     query: str
@@ -355,6 +403,11 @@ class Postserve:
             (
                 r'/poi/(way|relation|node):([0-9]+)',
                 GetPoi,
+                dict(pool=self.pool, verbose=self.verbose)
+            ),
+            (
+                r'/search/([\wа-яА-Я\s]+)',
+                Search,
                 dict(pool=self.pool, verbose=self.verbose)
             ),
             (
