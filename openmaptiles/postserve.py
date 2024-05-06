@@ -132,7 +132,7 @@ class Search(RequestHandler):
                 connection.add_log_listener(logger)
                 self.connection = connection
                 query = """SELECT fuzzy_search($1) LIMIT $2 OFFSET $3;"""
-                geojson = await connection.fetchval(query, name, limit, offset)
+                geojson = await connection.fetch(query, name, limit, offset)
                 if geojson is not None:
                     self.write(geojson)
                 else:
