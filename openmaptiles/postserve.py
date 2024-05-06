@@ -136,7 +136,7 @@ class Search(RequestHandler):
                 if geojson is not None:
                     self.write(geojson)
                 else:
-                    self.set_status(404)
+                    self.write('[]')
                 for msg in messages:
                     PgWarnings.print_message(msg)
                 connection.remove_log_listener(logger)
