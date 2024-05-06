@@ -1,7 +1,6 @@
 import re
-from typing import Union, Dict, Tuple
-
 from sys import stderr
+from typing import Union, Dict, Tuple
 
 from openmaptiles.pgutils import quote_literal
 from openmaptiles.tileset import Tileset, Layer
@@ -17,10 +16,10 @@ def collect_sql(tileset_filename, parallel=False, nodata=False
     tileset = Tileset(tileset_filename)
 
     run_first = '-- This SQL code should be executed first\n\n' + \
-                get_slice_language_tags(tileset) + '\n\n' + \
-                fuzzy_search_func()
+                get_slice_language_tags(tileset) + '\n'
     # at this point we don't have any SQL to run at the end
-    run_last = '-- This SQL code should be executed last\n'
+    run_last = '-- This SQL code should be executed last\n' + \
+               fuzzy_search_func()
 
     # resolved is a map of layer ID to some ID in results.
     # the ID in results could be the same as layer ID, or it could be a tuple of IDs
@@ -128,38 +127,49 @@ $$ LANGUAGE 'plpgsql';\n
 
 def fuzzy_search_func():
     return """\
-CREATE OR REPLACE FUNCTION public.fuzzy_search(query_name text)
-RETURNS text
-LANGUAGE sql
-immutable
-strict
-AS $function$
-  SELECT  json_agg(ST_AsGeoJSON(feature.*)) FROM (
-    SELECT global_id_from_imposm(osm_id) AS id, ST_Transform(geometry, 4326) AS geometry, NULLIF(name, '') AS name,
-        COALESCE(NULLIF(name_en, ''), name) AS name_en,
-        COALESCE(NULLIF(name_de, ''), name, name_en) AS name_de,
-        tags,
-        ref,
-        NULLIF(layer, 0) AS layer,
-        level,
-        CASE WHEN indoor=TRUE THEN 1  END as indoor
-        FROM (
-             SELECT osm_id, geometry, name, ref, name_en, name_de, tags, layer, level, indoor
-             FROM osm_poi_polygon
-             WHERE lower(name) LIKE '%' || lower(query_name) || '%' or ref % query_name
+CREATE index IF NOT EXISTS poi_polygon_name_trgm_idx ON osm_poi_polygon
+  USING gin (name gin_trgm_ops);
+
+ CREATE index IF NOT EXISTS poi_polygon_ref_trgm_idx ON osm_poi_polygon
+  USING gin (ref gin_trgm_ops);
+
+CREATE index IF NOT EXISTS poi_point_name_trgm_idx ON osm_poi_point
+  USING gin (name gin_trgm_ops);
+
+
+CREATE index IF NOT EXISTS indoor_polygon_name_trgm_idx ON osm_indoor_polygon
+  USING gin (name gin_trgm_ops);
+
+
+CREATE index IF NOT EXISTS indoor_polygon_ref_trgm_idx ON osm_indoor_polygon
+  USING gin (ref gin_trgm_ops);
+
+
+SET pg_trgm.similarity_threshold = 0.1;
+
+
+CREATE OR REPLACE FUNCTION public.fuzzy_search(query_name text) RETURNS text LANGUAGE sql immutable strict AS
+$function$ SELECT  json_agg(ST_AsGeoJSON(feature.*)) FROM ( SELECT global_id_from_imposm(osm_id) AS id, ST_Transform(
+geometry, 4326) AS geometry, NULLIF(name, '') AS name, tags, nullif(ref,''), NULLIF(layer, 0) AS layer, level,
+CASE WHEN indoor=TRUE THEN 1 ELSE NULL END as indoor, similarity FROM ( SELECT osm_id, geometry, name, ref, name_en,
+name_de, tags, layer, level, indoor, GREATEST(similarity(name, query_name),similarity(ref, query_name)) as similarity
+FROM osm_poi_polygon WHERE name % query_name or ref % query_name
 
              UNION ALL
 
-             SELECT osm_id, geometry, name, ref, name_en, name_de, tags, layer, level, indoor
+             SELECT osm_id, geometry, name, ref, name_en, name_de, tags, layer, level, indoor,
+             similarity(name, query_name) as similarity
              FROM osm_poi_point
-             WHERE lower(name) LIKE '%' || lower(query_name) || '%'
+             WHERE name % query_name
 
              UNION ALL
 
-             SELECT osm_id, geometry, name, ref, name_en, name_de, tags, null as layer, level, TRUE as indoor
+             SELECT osm_id, geometry, name, ref, name_en, name_de, tags, null as layer, level, TRUE as indoor,
+             GREATEST(similarity(name, query_name),similarity(ref, query_name)) as similarity
              FROM osm_indoor_polygon
-             WHERE lower(name) LIKE '%' || lower(query_name) || '%' or ref % query_name
+             WHERE name % query_name or ref % query_name
         ) AS poi_union
+       ORDER BY similarity DESC
   ) AS feature;
 $function$;
 """
