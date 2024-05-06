@@ -109,8 +109,8 @@ RUN set -eux ;\
         nano \
         procps  `# ps command` \
         gnupg2  `# TODO: not sure why gnupg2 is needed`  ;\
-    curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - ;\
-    /bin/bash -c 'source /etc/os-release && echo "deb http://apt.postgresql.org/pub/repos/apt/ ${VERSION_CODENAME:?}-pgdg main ${PG_MAJOR:?}" > /etc/apt/sources.list.d/pgdg.list' ;\
+    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/postgresql.gpg ;\
+    /bin/bash -c 'source /etc/os-release && echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt/ ${VERSION_CODENAME:?}-pgdg main ${PG_MAJOR:?}" > /etc/apt/sources.list.d/pgdg.list' ;\
     DEBIAN_FRONTEND=noninteractive apt-get update ;\
     DEBIAN_FRONTEND=noninteractive apt-get install  -y --no-install-recommends \
         aria2     `# multi-stream file downloader - used by download-osm` \
@@ -130,13 +130,13 @@ RUN set -eux ;\
     curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -  ;\
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends  \
         nodejs build-essential ;\
-    rm -rf /var/lib/apt/lists/  ;\
     npm install -g --unsafe-perm=true \
       @mapbox/mbtiles@0.12.1 \
       @mapbox/tilelive@6.1.1 \
       tilelive-pgquery@1.2.0 ;\
     \
     /bin/bash -c 'echo ""; echo ""; echo "##### Cleaning up"' >&2 ;\
+    DEBIAN_FRONTEND=noninteractive apt-get purge --auto-remove -y build-essential ;\
     rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid 1000 openmaptiles \
