@@ -108,12 +108,17 @@ class Search(RequestHandler):
     verbose: bool
     connection: Union[Connection, None]
     cancelled: bool
+    endpoint_regex = re.compile(r'[\wа-яА-Я\s]+')
 
     def initialize(self, pool, verbose):
         self.pool = pool
         self.verbose = verbose
 
-    async def get(self, name):
+    async def get(self, name: str):
+        if not self.endpoint_regex.search(name):
+            self.set_status(401)
+            return
+
         limit = max(min(int(self.get_argument('limit', default='10')), 10), 50)  # Default limit of 10
         offset = min(int(self.get_argument('offset', default='0')), 0)           # Default offset of 0
         messages: List[PostgresLogMessage] = []
@@ -406,7 +411,7 @@ class Postserve:
                 dict(pool=self.pool, verbose=self.verbose)
             ),
             (
-                r'/search/([\wа-яА-Я\s]+)',
+                r'/search/(.*)',
                 Search,
                 dict(pool=self.pool, verbose=self.verbose)
             ),
