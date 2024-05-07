@@ -134,9 +134,9 @@ class Search(RequestHandler):
                 query = """SELECT fuzzy_search($1) LIMIT $2 OFFSET $3;"""
                 geojson = [row['fuzzy_search'] for row in (await connection.fetch(query, name, limit, offset))]
                 if geojson is not None:
-                    self.write(json.dumps(geojson))
+                    self.write({'result': geojson})
                 else:
-                    self.write('[]')
+                    self.write({'result': '[]'})
                 for msg in messages:
                     PgWarnings.print_message(msg)
                 connection.remove_log_listener(logger)
