@@ -109,6 +109,7 @@ class Search(RequestHandler):
     connection: Union[Connection, None]
     cancelled: bool
     endpoint_regex = re.compile(r'[\wа-яА-Я\s]+')
+    type_regex = re.compile(r'\'(\w+)\':')
 
     def initialize(self, pool, verbose):
         self.pool = pool
@@ -120,7 +121,7 @@ class Search(RequestHandler):
             return
 
         limit = max(min(int(self.get_argument('limit', default='10')), 10), 50)  # Default limit of 10
-        offset = min(int(self.get_argument('offset', default='0')), 0)           # Default offset of 0
+        offset = min(int(self.get_argument('offset', default='0')), 0)  # Default offset of 0
         messages: List[PostgresLogMessage] = []
 
         def logger(_, log_msg: PostgresLogMessage):
@@ -128,15 +129,15 @@ class Search(RequestHandler):
 
         self.set_header('Content-Type', 'application/json')
         try:
-            async with self.pool.acquire() as connection:
+            async with (self.pool.acquire() as connection):
                 connection.add_log_listener(logger)
                 self.connection = connection
                 query = """SELECT fuzzy_search($1) LIMIT $2 OFFSET $3;"""
-                geojson = [json.loads(row['fuzzy_search']) for row in (await connection.fetch(query, name, limit, offset))]
-                if geojson is not None:
-                    self.write(str(geojson))
+                rows = await connection.fetch(query, name, limit, offset)
+                if rows is not None:
+                    self.write({'collection': [json.loads(row['fuzzy_search']) for row in rows]})
                 else:
-                    self.write('[]')
+                    self.write({'collection': []})
                 for msg in messages:
                     PgWarnings.print_message(msg)
                 connection.remove_log_listener(logger)
