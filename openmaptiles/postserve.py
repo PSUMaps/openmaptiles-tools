@@ -120,8 +120,8 @@ class Search(RequestHandler):
             self.set_status(401)
             return
 
-        limit = max(min(int(self.get_argument('limit', default='10')), 10), 50)  # Default limit of 10
-        offset = min(int(self.get_argument('offset', default='0')), 0)  # Default offset of 0
+        limit = min(max(int(self.get_argument('limit', default='10')), 5), 50)  # Default limit of 10
+        offset = max(int(self.get_argument('offset', default='0')), 0)  # Default offset of 0
         messages: List[PostgresLogMessage] = []
 
         def logger(_, log_msg: PostgresLogMessage):
