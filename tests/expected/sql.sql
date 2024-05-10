@@ -115,31 +115,23 @@ CREATE OR REPLACE FUNCTION public.fuzzy_search(query_name text)
  LANGUAGE sql
  immutable
  strict
+ parallel safe
 AS $function$
   SELECT ST_AsGeoJSON(feature.*) FROM (
     SELECT global_id_from_imposm(osm_id) AS id, ST_Transform(geometry, 4326) AS geometry, NULLIF(name, '') AS name,
         tags,
         nullif(ref,'') as ref,
-        NULLIF(layer, 0) AS layer,
         level,
-        CASE WHEN indoor=TRUE THEN 1 ELSE NULL END as indoor,
         similarity
         FROM (
-             SELECT osm_id, geometry, name, ref, name_en, name_de, tags, layer, level, indoor,
-             GREATEST(similarity(name, query_name),similarity(ref, query_name)) as similarity
-             FROM osm_poi_polygon
-             WHERE similarity(name, query_name) > 0.1 or similarity(ref, query_name) > 0.1
-
-             UNION ALL
-
-             SELECT osm_id, geometry, name, ref, name_en, name_de, tags, layer, level, indoor,
+             SELECT osm_id, geometry, name, ref, tags, level,
              similarity(name, query_name) as similarity
              FROM osm_poi_point
              WHERE similarity(name, query_name) > 0.1
 
              UNION ALL
 
-             SELECT osm_id, geometry, name, ref, name_en, name_de, tags, null as layer, level, TRUE as indoor,
+             SELECT osm_id, geometry, name, ref, tags, level,
              GREATEST(similarity(name, query_name),similarity(ref, query_name)) as similarity
              FROM osm_indoor_polygon
              WHERE similarity(name, query_name) > 0.1 or similarity(ref, query_name) > 0.1
