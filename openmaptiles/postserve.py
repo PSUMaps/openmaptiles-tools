@@ -108,8 +108,7 @@ class Search(RequestHandler):
     verbose: bool
     connection: Union[Connection, None]
     cancelled: bool
-    endpoint_regex = re.compile(r'[\wа-яА-Я\s]+')
-    type_regex = re.compile(r'\'(\w+)\':')
+    endpoint_regex = re.compile(r'^[\wа-яА-Я\s]+$')
 
     def initialize(self, pool, verbose):
         self.pool = pool
@@ -147,6 +146,100 @@ class Search(RequestHandler):
                 raise err
             elif self.verbose:
                 print(f'SEARCH POI {name} was cancelled.')
+        finally:
+            self.connection = None
+
+    def on_connection_close(self):
+        if self.connection:
+            self.cancelled = True
+            self.connection.terminate()
+
+
+class SearchAmenity(RequestHandler):
+    pool: Pool
+    query: str
+    verbose: bool
+    connection: Union[Connection, None]
+    cancelled: bool
+
+    def initialize(self, pool, verbose):
+        self.pool = pool
+        self.verbose = verbose
+
+    async def get(self, name: str):
+        limit = min(max(int(self.get_argument('limit', default='10')), 5), 50)  # Default limit of 10
+        offset = max(int(self.get_argument('offset', default='0')), 0)  # Default offset of 0
+        messages: List[PostgresLogMessage] = []
+
+        def logger(_, log_msg: PostgresLogMessage):
+            messages.append(log_msg)
+
+        self.set_header('Content-Type', 'application/json')
+        try:
+            async with (self.pool.acquire() as connection):
+                connection.add_log_listener(logger)
+                self.connection = connection
+                query = """SELECT search_tag($1) LIMIT $2 OFFSET $3;"""
+                rows = await connection.fetch(query, name, limit, offset)
+                if rows is not None:
+                    self.write({'collection': [json.loads(row['search_tag']) for row in rows]})
+                else:
+                    self.write({'collection': []})
+                for msg in messages:
+                    PgWarnings.print_message(msg)
+                connection.remove_log_listener(logger)
+
+        except ConnectionDoesNotExistError as err:
+            if not self.cancelled:
+                raise err
+            elif self.verbose:
+                print(f'SEARCH AMENITY {name} was cancelled.')
+        finally:
+            self.connection = None
+
+    def on_connection_close(self):
+        if self.connection:
+            self.cancelled = True
+            self.connection.terminate()
+
+
+class GetAmenity(RequestHandler):
+    pool: Pool
+    query: str
+    verbose: bool
+    connection: Union[Connection, None]
+    cancelled: bool
+
+    def initialize(self, pool, verbose):
+        self.pool = pool
+        self.verbose = verbose
+
+    async def get(self):
+        messages: List[PostgresLogMessage] = []
+
+        def logger(_, log_msg: PostgresLogMessage):
+            messages.append(log_msg)
+
+        self.set_header('Content-Type', 'application/json')
+        try:
+            async with (self.pool.acquire() as connection):
+                connection.add_log_listener(logger)
+                self.connection = connection
+                query = """SELECT get_amenity();"""
+                rows = await connection.fetch(query)
+                if rows is not None:
+                    self.write({'collection': [row['get_amenity'] for row in rows]})
+                else:
+                    self.write({'collection': []})
+                for msg in messages:
+                    PgWarnings.print_message(msg)
+                connection.remove_log_listener(logger)
+
+        except ConnectionDoesNotExistError as err:
+            if not self.cancelled:
+                raise err
+            elif self.verbose:
+                print('Amenity list was cancelled.')
         finally:
             self.connection = None
 
@@ -400,6 +493,16 @@ class Postserve:
                 r'/',
                 GetMetadata,
                 dict(metadata=self.metadata)
+            ),
+            (
+                r'/amenity',
+                GetAmenity,
+                dict(pool=self.pool, verbose=self.verbose)
+            ),
+            (
+                r'/amenity/(\w+)',
+                SearchAmenity,
+                dict(pool=self.pool, verbose=self.verbose)
             ),
             (
                 r'/replicationstatus',
