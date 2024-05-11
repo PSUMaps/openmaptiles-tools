@@ -18,6 +18,10 @@ ARG UTF8PROC_REPO=https://github.com/JuliaLang/utf8proc.git
 ARG MAPNIK_GERMAN_L10N_TAG=v2.5.9.3
 ARG MAPNIK_GERMAN_L10N_REPO=https://github.com/openmaptiles/mapnik-german-l10n.git
 
+# https://github.com/pgRouting/pgrouting/releases
+ARG PGROUTING_TAG=v3.6.2
+ARG PGROUTING_REPO=https://github.com/pgRouting/pgrouting.git
+
 
 RUN set -eux  ;\
     apt-get -qq -y update  ;\
@@ -25,6 +29,7 @@ RUN set -eux  ;\
     ## Install build dependencies
     apt-get -qq -y --no-install-recommends install \
         build-essential \
+        cmake \
         ca-certificates \
         # Required by Nominatim to download data files
         curl \
@@ -72,6 +77,17 @@ RUN set -eux  ;\
     make  ;\
     make install  ;\
     rm -rf /opt/mapnik-german-l10n  ;\
+    ##
+    ## pgrouting ext
+    cd /opt/  ;\
+    git clone --quiet --depth 1 -b $PGROUTING_TAG $PGROUTING_REPO  ;\
+    cd pgrouting  ;\
+    mkdir build ;\
+    cd build ;\
+    cmake  .. ;\
+    make ;\
+    make install  ;\
+    rm -rf /opt/pgrouting  ;\
     ##
     ## Cleanup
     apt-get -qq -y --auto-remove purge \

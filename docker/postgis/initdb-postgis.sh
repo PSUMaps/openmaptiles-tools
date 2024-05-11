@@ -24,6 +24,7 @@ for db in template_postgis "$POSTGRES_DB"; do
 
     -- These extensions are already loaded by the parent docker
     CREATE EXTENSION IF NOT EXISTS postgis;
+    CREATE EXTENSION IF NOT EXISTS pgrouting;
     CREATE EXTENSION IF NOT EXISTS fuzzystrmatch;
     CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
