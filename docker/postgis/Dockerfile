@@ -1,4 +1,4 @@
-ARG BASE_POSTGIS_VER=14-3.3
+ARG BASE_POSTGIS_VER=16-3.4
 FROM postgis/postgis:$BASE_POSTGIS_VER
 
 LABEL maintainer="Yuri Astrakhan <YuriAstrakhan@gmail.com>"
@@ -13,10 +13,6 @@ ARG PGSQL_GZIP_REPO=https://github.com/pramsey/pgsql-gzip.git
 # https://github.com/JuliaLang/utf8proc/releases
 ARG UTF8PROC_TAG=v2.5.0
 ARG UTF8PROC_REPO=https://github.com/JuliaLang/utf8proc.git
-
-# osml10n - https://github.com/openmaptiles/mapnik-german-l10n/releases
-ARG MAPNIK_GERMAN_L10N_TAG=v2.5.9.3
-ARG MAPNIK_GERMAN_L10N_REPO=https://github.com/openmaptiles/mapnik-german-l10n.git
 
 # https://github.com/pgRouting/pgrouting/releases
 ARG PGROUTING_TAG=v3.6.2
@@ -69,14 +65,6 @@ RUN set -eux  ;\
     make install  ;\
     ldconfig  ;\
     rm -rf /opt/utf8proc  ;\
-    ##
-    ## osml10n extension (originally Mapnik German)
-    cd /opt/  ;\
-    git clone --quiet --depth 1 -b $MAPNIK_GERMAN_L10N_TAG $MAPNIK_GERMAN_L10N_REPO  ;\
-    cd mapnik-german-l10n  ;\
-    make  ;\
-    make install  ;\
-    rm -rf /opt/mapnik-german-l10n  ;\
     ##
     ## pgrouting ext
     cd /opt/  ;\

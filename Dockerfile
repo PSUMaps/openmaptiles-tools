@@ -75,7 +75,7 @@ RUN set -eux ;\
 FROM python:3.9-slim
 LABEL maintainer="Yuri Astrakhan <YuriAstrakhan@gmail.com>"
 
-ARG PG_MAJOR=14
+ARG PG_MAJOR=16
 ARG TOOLS_DIR=/usr/src/app
 
 WORKDIR ${TOOLS_DIR}

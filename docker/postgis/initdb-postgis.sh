@@ -31,7 +31,6 @@ for db in template_postgis "$POSTGRES_DB"; do
     -- Extensions needed for OpenMapTiles
     CREATE EXTENSION IF NOT EXISTS hstore;
     CREATE EXTENSION IF NOT EXISTS unaccent;
-    CREATE EXTENSION IF NOT EXISTS osml10n;
     CREATE EXTENSION IF NOT EXISTS gzip;
 EOSQL
 done

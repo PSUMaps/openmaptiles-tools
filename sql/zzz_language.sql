@@ -69,7 +69,7 @@ CREATE OR REPLACE FUNCTION get_latin_name(tags hstore, geometry geometry) RETURN
       END,
       NULLIF(tags->'name:en', ''),
       NULLIF(tags->'int_name', ''),
-      NULLIF(osml10n_get_name_without_brackets_from_tags(tags, 'en', geometry), '')
+      NULLIF(tags->'name', '')
     );
 $$ LANGUAGE SQL IMMUTABLE;
 
