@@ -1,4 +1,4 @@
-FROM golang:1.17 as go-builder
+FROM golang:1.21 as go-builder
 ARG IMPOSM_REPO="https://github.com/omniscale/imposm3.git"
 ARG IMPOSM_VERSION="master"
 
@@ -16,7 +16,7 @@ RUN set -eux ;\
     apt list --installed ;\
     \
     go version ;\
-    go get github.com/tools/godep ;\
+    go install github.com/tools/godep@latest ;\
     mkdir /build-bin ;\
     \
     /bin/bash -c 'echo ""; echo ""; echo "##### Build imposm3 -- $IMPOSM_REPO in version $IMPOSM_VERSION"' >&2 ;\

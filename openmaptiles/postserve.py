@@ -101,6 +101,7 @@ class GetPoi(RequestHandledWithCors):
             self.cancelled = True
             self.connection.terminate()
 
+
 class GetIndoor(RequestHandledWithCors):
     pool: Pool
     query: str
