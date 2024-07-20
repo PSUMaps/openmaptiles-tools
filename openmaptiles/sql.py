@@ -238,6 +238,10 @@ FROM (SELECT osm_id                       AS id,
       FROM osm_indoor_polygon
       WHERE osm_id = query_id) AS feature;
 $$ LANGUAGE SQL IMMUTABLE;
+
+create role web_anon nologin;
+grant usage on schema public to web_anon;
+grant select on osm_indoor_polygon, osm_poi_point to web_anon;
 """
 
 
