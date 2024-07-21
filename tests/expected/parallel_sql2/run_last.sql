@@ -108,7 +108,17 @@ FROM (SELECT osm_id                       AS id,
              NULLIF(name, '')             AS name,
              tags
       FROM osm_indoor_polygon
-      WHERE osm_id = query_id) AS feature;
+      WHERE osm_id = query_id
+
+      UNION ALL
+
+      SELECT osm_id                       AS id,
+             ST_Transform(geometry, 4326) AS geometry,
+             NULLIF(name, '')             AS name,
+             tags
+      FROM osm_poi_point
+      WHERE osm_id = query_id
+     ) AS feature;
 $$ LANGUAGE SQL IMMUTABLE;
 
 DO
