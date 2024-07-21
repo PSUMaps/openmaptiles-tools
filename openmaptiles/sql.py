@@ -237,7 +237,7 @@ FROM (SELECT osm_id                       AS id,
              tags
       FROM osm_indoor_polygon
       WHERE osm_id = query_id
-      
+
       UNION ALL
 
       SELECT osm_id                       AS id,
