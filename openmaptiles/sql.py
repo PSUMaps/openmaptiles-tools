@@ -239,9 +239,18 @@ FROM (SELECT osm_id                       AS id,
       WHERE osm_id = query_id) AS feature;
 $$ LANGUAGE SQL IMMUTABLE;
 
-create role web_anon nologin;
-grant usage on schema public to web_anon;
-grant select on osm_indoor_polygon, osm_poi_point to web_anon;
+DO
+$$
+    BEGIN
+        IF NOT EXISTS (SELECT 1
+                       FROM pg_roles
+                       WHERE rolname = 'web_anon') THEN
+            CREATE ROLE web_anon nologin;
+            GRANT USAGE ON SCHEMA public TO web_anon;
+            GRANT SELECT ON osm_indoor_polygon, osm_poi_point TO web_anon;
+        END IF;
+    END
+$$;
 """
 
 
