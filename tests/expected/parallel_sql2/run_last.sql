@@ -133,3 +133,36 @@ $$
         END IF;
     END
 $$;
+
+DROP FUNCTION IF EXISTS getmvt(zoom integer, x integer, y integer);
+CREATE FUNCTION getmvt(zoom integer, x integer, y integer)
+    RETURNS TABLE(mvt bytea, key text) AS $$
+BEGIN
+    RETURN QUERY SELECT
+                     decode('00', 'hex')::bytea AS mvt,
+                     '0' AS key;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION gettile(zoom INT, x INT, y INT) RETURNS bytea AS
+$$
+DECLARE
+    headers      TEXT;
+    DECLARE blob bytea;
+begin
+    select '[{"Content-Type": "application/x-protobuf"},'
+               '{"Content-Encoding": "gzip"}]'
+    into headers;
+    perform set_config('response.headers', headers, true);
+    select mvt from getmvt(zoom, x, y) into blob;
+    if FOUND -- special var, see https://www.postgresql.org/docs/current/plpgsql-statements.html#PLPGSQL-STATEMENTS-DIAGNOSTICS
+    then
+        return (blob);
+    else
+        raise sqlstate 'PT404' using
+            message = 'NOT FOUND',
+            detail = 'Tile not found',
+            hint = format('%s / %s / %s seems to be an invalid tile', zoom, x, y);
+    end if;
+end
+$$ language plpgsql;
