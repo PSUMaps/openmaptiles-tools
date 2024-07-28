@@ -111,57 +111,88 @@ CREATE index IF NOT EXISTS indoor_polygon_ref_trgm_idx ON osm_indoor_polygon
   USING gin (ref gin_trgm_ops);
 
 CREATE OR REPLACE FUNCTION public.fuzzy_search(query_name text)
-    RETURNS json
-    LANGUAGE sql
-    immutable
-    strict
-    parallel safe
+    RETURNS setof json
+    LANGUAGE plpgsql
+    IMMUTABLE
+    STRICT
+    PARALLEL SAFE
 AS
 $function$
-SELECT json_agg(st_asgeojson(feature.*)::json)
-FROM (SELECT global_id_from_imposm(osm_id) AS id,
-             ST_Transform(geometry, 4326)  AS geometry,
-             NULLIF(name, '')              AS name,
-             tags,
-             nullif(ref, '')               as ref,
-             level,
-             similarity
-      FROM (SELECT osm_id,
-                   geometry,
-                   name,
-                   ref,
-                   tags,
-                   level,
-                   similarity(name, query_name) as similarity
-            FROM osm_poi_point
-            WHERE similarity(name, query_name) > 0.1
+DECLARE
+    result RECORD;
+BEGIN
+    RETURN QUERY SELECT ST_AsGeoJSON(feature.*)::json as geojson
+                 FROM (
+                          SELECT global_id_from_imposm(osm_id) AS id,
+                                 ST_Transform(geometry, 4326) AS geometry,
+                                 ToPoint(ST_Transform(geometry, 4326)) as point,
+                                 NULLIF(name, '') AS name,
+                                 tags,
+                                 NULLIF(ref, '') AS ref,
+                                 level
+                          FROM osm_indoor_polygon
+                          WHERE tags->'building' = substring(query_name from '^\d{3}/(\d{1,2})$')
+                            AND tags->'ref' = substring(query_name from '^(\d{3})/\d{1,2}$')
+                      ) AS feature;
 
-            UNION ALL
+    IF NOT FOUND THEN
+        FOR result IN
+            SELECT ST_AsGeoJSON(feature.*)::json AS geojson
+            FROM (
+                     SELECT global_id_from_imposm(osm_id) AS id,
+                            ST_Transform(geometry, 4326) AS geometry,
+                            ToPoint(ST_Transform(geometry, 4326)) as point,
+                            NULLIF(name, '') AS name,
+                            tags,
+                            NULLIF(ref, '') AS ref,
+                            level,
+                            similarity
+                     FROM (
+                              SELECT osm_id,
+                                     geometry,
+                                     name,
+                                     ref,
+                                     tags,
+                                     level,
+                                     similarity(name, query_name) AS similarity
+                              FROM osm_poi_point
+                              WHERE similarity(name, query_name) > 0.1
 
-            SELECT osm_id,
-                   geometry,
-                   name,
-                   ref,
-                   tags,
-                   level,
-                   GREATEST(similarity(name, query_name), similarity(ref, query_name)) as similarity
-            FROM osm_indoor_polygon
-            WHERE similarity(name, query_name) > 0.1
-               or similarity(ref, query_name) > 0.1) AS poi_union
-      ORDER BY similarity DESC) AS feature;
+                              UNION ALL
+
+                              SELECT osm_id,
+                                     geometry,
+                                     name,
+                                     ref,
+                                     tags,
+                                     level,
+                                     GREATEST(similarity(name, query_name), similarity(ref, query_name)) AS similarity
+                              FROM osm_indoor_polygon
+                              WHERE similarity(name, query_name) > 0.1
+                                 OR similarity(ref, query_name) > 0.1
+                          ) AS poi_union
+                     ORDER BY similarity DESC
+                 ) AS feature
+            LOOP
+                RETURN NEXT result.geojson;
+            END LOOP;
+    END IF;
+    RETURN;
+END;
 $function$;
 
 CREATE OR REPLACE FUNCTION public.search_tag(query_name text)
-    RETURNS json
+    RETURNS setof json
     LANGUAGE sql
     immutable
     strict
     parallel safe
 AS
 $function$
-SELECT json_agg(st_asgeojson(feature.*)::json)
+SELECT (st_asgeojson(feature.*)::json)
 FROM (SELECT global_id_from_imposm(osm_id) AS id,
              ST_Transform(geometry, 4326)  AS geometry,
+             ToPoint(ST_Transform(geometry, 4326)) as point,
              NULLIF(name, '')              AS name,
              tags,
              nullif(ref, '')               as ref,
@@ -178,14 +209,14 @@ FROM (SELECT global_id_from_imposm(osm_id) AS id,
 $function$;
 
 CREATE OR REPLACE FUNCTION public.get_amenity()
-    RETURNS json
+    RETURNS setof varchar
     LANGUAGE sql
     immutable
     strict
     parallel safe
 AS
 $function$
-SELECT json_agg(amenity)
+SELECT amenity
 FROM (SELECT DISTINCT subclass as amenity
       FROM osm_poi_point
 
@@ -201,6 +232,7 @@ $$
 SELECT ST_AsGeoJSON(feature.*)::json
 FROM (SELECT osm_id                       AS id,
              ST_Transform(geometry, 4326) AS geometry,
+             ToPoint(ST_Transform(geometry, 4326)) as point,
              NULLIF(name, '')             AS name,
              tags
       FROM osm_indoor_polygon
@@ -210,6 +242,7 @@ FROM (SELECT osm_id                       AS id,
 
       SELECT osm_id                       AS id,
              ST_Transform(geometry, 4326) AS geometry,
+             ToPoint(ST_Transform(geometry, 4326)) as point,
              NULLIF(name, '')             AS name,
              tags
       FROM osm_poi_point
@@ -225,7 +258,9 @@ $$
                        WHERE rolname = 'web_anon') THEN
             CREATE ROLE web_anon nologin;
             GRANT USAGE ON SCHEMA public TO web_anon;
-            GRANT SELECT ON osm_indoor_polygon, osm_poi_point TO web_anon;
+            GRANT SELECT ON osm_indoor_polygon, osm_poi_point, osm_area_point,
+                osm_transportation_linestring, osm_poi_polygon, osm_area_heatpoint, osm_building_polygon,
+                osm_building_area_point, osm_indoor_linestring TO web_anon;
         END IF;
     END
 $$;
@@ -240,14 +275,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION gettile(zoom INT, x INT, y INT) RETURNS bytea AS
+CREATE DOMAIN "application/x-protobuf" AS bytea;
+
+CREATE OR REPLACE FUNCTION gettile(zoom INT, x INT, y INT) RETURNS "application/x-protobuf" AS
 $$
 DECLARE
     headers      TEXT;
     DECLARE blob bytea;
 begin
-    select '[{"Content-Type": "application/x-protobuf"},'
-               '{"Content-Encoding": "gzip"}]'
+    select '[{"Content-Type": "application/x-protobuf"}]'
     into headers;
     perform set_config('response.headers', headers, true);
     select mvt from getmvt(zoom, x, y) into blob;
